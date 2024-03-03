@@ -1,5 +1,10 @@
 const Dentist = require('../models/Dentist');
 const Booking = require('../models/Booking');
+const dotenv = require('dotenv');
+const sgMail = require('@sendgrid/mail');
+dotenv.config({ path: './config/config.env'});
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// console.log(process.env.SENDGRID_API_KEY);
 
 // @desc    Get all bookings
 // @route   GET/api/bookings
@@ -13,9 +18,9 @@ exports.getBookings = async (req, res, next) => {
         });
     }
     else {
-        if(req.params.detistId) {
+        if(req.params.dentistId) {
             console.log(req.params.dentistId);
-            query = Booking.find({hospital: req.params.dentistId}).populate({
+            query = Booking.find({dentist: req.params.dentistId}).populate({
                 path: 'dentist',
                 select: 'name'
             });
@@ -73,6 +78,8 @@ exports.addBooking = async (req, res, next) => {
             return res.status(400).json({ success: false, message: `The user with ID ${req.user.id} has already made a booking.`});
         }
         const booking = await Booking.create(req.body);
+
+        sgMail.send(generateEmailMessage('create', booking));
         res.status(200).json({ success: true, data: booking });
     } catch (error) {
         console.log(error);
@@ -102,7 +109,7 @@ exports.updateBooking = async (req, res, next) => {
             new: true,
             runValidators: true
         });
-
+        sgMail.send(generateEmailMessage('update', booking));
         res.status(200).json({ success: true, data: booking });
     } catch (error) {
         console.log(error);
@@ -124,9 +131,63 @@ exports.deleteBooking = async (req, res, next) => {
         }
 
         await booking.deleteOne();
+        sgMail.send(generateEmailMessage('delete', booking));
         res.status(200).json({ success: true, data: {} });
     } catch (error) {
         console.log(error);
         return res.status(500).json({ success: false, message: 'Cannot delete booking' });
     }
 }
+
+const generateEmailMessage = (action, booking) => {
+    let subject, introText;
+
+    if (action === 'create') {
+        subject = 'Booking Confirmation';
+        introText = 'Thank you for making a booking with our dentist.';
+    } else if (action === 'update') {
+        subject = 'Update Confirmation';
+        introText = 'Thank you for updating your booking with our dentist.';
+    } else if (action === 'delete') {
+        subject = 'Cancellation Confirmation';
+        introText = 'We regret to inform you that your booking has been canceled.';
+    }
+
+    const bookingDetailsHTML = action === 'create' ? `
+        <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 20px;">
+            <p style="margin: 0;"><strong>Your Booking Details:</strong></p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <tr>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Field</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Value</th>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.bookDate}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Dentist</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.dentist}</td>
+                </tr>
+            </table>
+        </div>
+    ` : '';
+
+    return {
+        to: 'Punnarunwork@gmail.com', // Use the user's email address
+        from: 'Punnarunwork@gmail.com',
+        subject,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #007BFF;">${subject}</h2>
+                <p>Dear Customer,</p>
+                <p>${introText}</p>
+                
+                ${bookingDetailsHTML}
+                
+                <p style="margin-top: 20px;">We appreciate your trust in our services.</p>
+                <p>Best regards,<br>Mongkol Dental Clinic Team</p>
+            </div>
+        `
+    };
+};
