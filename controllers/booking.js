@@ -1,7 +1,10 @@
 const Dentist = require('../models/Dentist');
 const Booking = require('../models/Booking');
+const dotenv = require('dotenv');
 const sgMail = require('@sendgrid/mail');
-sgMail.setApiKey('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')
+dotenv.config({ path: './config/config.env'});
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// console.log(process.env.SENDGRID_API_KEY);
 
 // @desc    Get all bookings
 // @route   GET/api/bookings
