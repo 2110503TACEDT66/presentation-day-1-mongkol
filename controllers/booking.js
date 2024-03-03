@@ -1,5 +1,7 @@
 const Dentist = require('../models/Dentist');
 const Booking = require('../models/Booking');
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey('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')
 
 // @desc    Get all bookings
 // @route   GET/api/bookings
@@ -13,9 +15,9 @@ exports.getBookings = async (req, res, next) => {
         });
     }
     else {
-        if(req.params.detistId) {
+        if(req.params.dentistId) {
             console.log(req.params.dentistId);
-            query = Booking.find({hospital: req.params.dentistId}).populate({
+            query = Booking.find({dentist: req.params.dentistId}).populate({
                 path: 'dentist',
                 select: 'name'
             });
@@ -73,6 +75,44 @@ exports.addBooking = async (req, res, next) => {
             return res.status(400).json({ success: false, message: `The user with ID ${req.user.id} has already made a booking.`});
         }
         const booking = await Booking.create(req.body);
+
+        //send email to user
+        const msg = {
+            to: 'Punnarunwork@gmail.com',
+            from: 'Punnarunwork@gmail.com',
+            subject: 'Booking Confirmation',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #007BFF;">Booking Confirmation</h2>
+                    <p>Dear Customer,</p>
+                    <p>Thank you for making a booking with our dentist.</p>
+                    
+                    <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 20px;">
+                        <p style="margin: 0;"><strong>Your Booking Details:</strong></p>
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                            <tr>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Field</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Value</th>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.bookDate}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Dentist</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.dentist}</td>
+                            </tr>
+                        </table>
+                    </div>
+            
+                    <p style="margin-top: 20px;">We look forward to seeing you soon!</p>
+                    <p>Best regards,<br>Mongkol Dental Clinic Team</p>
+                </div>
+            `,
+        };
+        
+        sgMail.send(msg).then(console.log("Email Send!"))
+
         res.status(200).json({ success: true, data: booking });
     } catch (error) {
         console.log(error);
