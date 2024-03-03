@@ -76,43 +76,7 @@ exports.addBooking = async (req, res, next) => {
         }
         const booking = await Booking.create(req.body);
 
-        //send email to user
-        const msg = {
-            to: 'Punnarunwork@gmail.com',
-            from: 'Punnarunwork@gmail.com',
-            subject: 'Booking Confirmation',
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #007BFF;">Booking Confirmation</h2>
-                    <p>Dear Customer,</p>
-                    <p>Thank you for making a booking with our dentist.</p>
-                    
-                    <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 20px;">
-                        <p style="margin: 0;"><strong>Your Booking Details:</strong></p>
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                            <tr>
-                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Field</th>
-                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Value</th>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</td>
-                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.bookDate}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Dentist</td>
-                                <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.dentist}</td>
-                            </tr>
-                        </table>
-                    </div>
-            
-                    <p style="margin-top: 20px;">We look forward to seeing you soon!</p>
-                    <p>Best regards,<br>Mongkol Dental Clinic Team</p>
-                </div>
-            `,
-        };
-        
-        sgMail.send(msg).then(console.log("Email Send!"))
-
+        sgMail.send(generateEmailMessage('create', booking));
         res.status(200).json({ success: true, data: booking });
     } catch (error) {
         console.log(error);
@@ -142,7 +106,7 @@ exports.updateBooking = async (req, res, next) => {
             new: true,
             runValidators: true
         });
-
+        sgMail.send(generateEmailMessage('update', booking));
         res.status(200).json({ success: true, data: booking });
     } catch (error) {
         console.log(error);
@@ -164,9 +128,63 @@ exports.deleteBooking = async (req, res, next) => {
         }
 
         await booking.deleteOne();
+        sgMail.send(generateEmailMessage('delete', booking));
         res.status(200).json({ success: true, data: {} });
     } catch (error) {
         console.log(error);
         return res.status(500).json({ success: false, message: 'Cannot delete booking' });
     }
 }
+
+const generateEmailMessage = (action, booking) => {
+    let subject, introText;
+
+    if (action === 'create') {
+        subject = 'Booking Confirmation';
+        introText = 'Thank you for making a booking with our dentist.';
+    } else if (action === 'update') {
+        subject = 'Update Confirmation';
+        introText = 'Thank you for updating your booking with our dentist.';
+    } else if (action === 'delete') {
+        subject = 'Cancellation Confirmation';
+        introText = 'We regret to inform you that your booking has been canceled.';
+    }
+
+    const bookingDetailsHTML = action === 'create' ? `
+        <div style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin-top: 20px;">
+            <p style="margin: 0;"><strong>Your Booking Details:</strong></p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <tr>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Field</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Value</th>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.bookDate}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">Dentist</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${booking.dentist}</td>
+                </tr>
+            </table>
+        </div>
+    ` : '';
+
+    return {
+        to: 'Punnarunwork@gmail.com', // Use the user's email address
+        from: 'Punnarunwork@gmail.com',
+        subject,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #007BFF;">${subject}</h2>
+                <p>Dear Customer,</p>
+                <p>${introText}</p>
+                
+                ${bookingDetailsHTML}
+                
+                <p style="margin-top: 20px;">We appreciate your trust in our services.</p>
+                <p>Best regards,<br>Mongkol Dental Clinic Team</p>
+            </div>
+        `
+    };
+};
