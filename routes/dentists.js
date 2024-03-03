@@ -2,6 +2,10 @@ const express = require('express');
 const {protect,authorize} = require('../middleware/auth');
 const {getDentists, getDentist, createDentist, updateDentist, deleteDentist} = require('../controllers/dentist');
 const router = express.Router();
+const bookingRouter = require('./bookings');
+
+// Re-route into other resource routers
+router.use('/:dentistId/bookings', bookingRouter);
 
 router.route('/')
     .get(getDentists)
