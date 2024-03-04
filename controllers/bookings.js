@@ -14,7 +14,7 @@ exports.getBookings = async (req, res, next) => {
     if (req.user.role !== 'admin') {
         query = Booking.find({user: req.user.id}).populate({
             path: 'dentist',
-            select: 'name'
+            select: 'name yearOfExperience areaOfExpertise'
         });
     }
     else {
@@ -22,13 +22,13 @@ exports.getBookings = async (req, res, next) => {
             console.log(req.params.dentistId);
             query = Booking.find({dentist: req.params.dentistId}).populate({
                 path: 'dentist',
-                select: 'name'
+                select: 'name yearOfExperience areaOfExpertise'
             });
         }
         else {
             query = Booking.find().populate({
                 path: 'dentist',
-                select: 'name'
+                select: 'name yearOfExperience areaOfExpertise'
             });
         }
     }
@@ -49,7 +49,6 @@ exports.getBooking = async (req, res, next) => {
             select: 'name yearOfExperience areaOfExpertise'
         });
 
-
         if (!booking) {
             return res.status(404).json({ success: false , message: `No booking with the id of ${req.params.id}` });
         }
@@ -63,29 +62,33 @@ exports.getBooking = async (req, res, next) => {
 // @desc    Create new appointment
 // @route   POST /api/v1/hospitals/:hospitalId/appointments
 // @access  Private
-exports.addBooking = async (req, res, next) => {
-    try {
-        const dentist = await Dentist.findById(req.body.dentist);
-        if (!dentist) {
-            return res.status(404).json({ success: false, message: `No dentist with the id of ${req.body.dentist}` });
-        } console.log(req.body);
-
-        //add user Id to req.body
-        req.body.user = req.user.id;
-
-        const existedBooking = await Booking.find({user:req.user.id});
-        if (existedBooking.length >= 1 && req.user.role !== 'admin') {
-            return res.status(400).json({ success: false, message: `The user with ID ${req.user.id} has already made a booking.`});
+exports.addBooking=async (req,res,next)=>{
+    try{
+        req.body.dentist=req.params.dentistId;
+        const dentist = await Dentist.findById(req.params.dentistId);
+        
+        if(!dentist){
+            return res.status(404).json({ success:false, message:`No dentists with the id of ${req.params.dentistId}`});
         }
-        const booking = await Booking.create(req.body);
 
-        sgMail.send(generateEmailMessage('create', booking, req.user.email));
-        res.status(200).json({ success: true, data: booking });
-    } catch (error) {
+        req.body.user=req.user.id;
+        const Booked = await Booking.find({user:req.user.id});
+        
+        //Change to 1 according to requirement
+        if(Booked.length >= 1 && req.user.role !== 'admin'){
+            return res.status(400).json({ success: false, message: `User : ${req.user.id} has already made an booking`});
+        }
+
+        const booking = await Booking.create(req.body);
+        sgMail.send(generateEmailMessage('create', booking));
+        res.status(200).json({ success:true, data: booking });
+
+    }catch(error){
         console.log(error);
-        return res.status(500).json({ success: false, message: 'Cannot create booking' });
+        return res.status(500).json({ success:false, message:"Cannot create Booking" });
     }
-};
+}
+
 
 exports.updateBooking = async (req, res, next) => {
     try {
@@ -100,16 +103,11 @@ exports.updateBooking = async (req, res, next) => {
             return res.status(401).json({ success: false, message: `User ${req.user.id} is not authorized to update this booking` });
         }
 
-        let dentist = await Dentist.findById(req.body.dentist);
-        if (!dentist) {
-            return res.status(404).json({ success: false, message: `No dentist with the id of ${req.body.dentist}` });
-        }
-        
         booking = await Booking.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
         });
-        sgMail.send(generateEmailMessage('update', booking, req.user.email));
+        sgMail.send(generateEmailMessage('update', booking));
         res.status(200).json({ success: true, data: booking });
     } catch (error) {
         console.log(error);
@@ -129,16 +127,16 @@ exports.deleteBooking = async (req, res, next) => {
         if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') {
             return res.status(401).json({ success: false, message: `User ${req.user.id} is not authorized to delete this booking` });
         }
-
         await booking.deleteOne();
-        sgMail.send(generateEmailMessage('delete', booking, req.user.email));
+        sgMail.send(generateEmailMessage('delete', booking));
         res.status(200).json({ success: true, data: {} });
     } catch (error) {
         console.log(error);
         return res.status(500).json({ success: false, message: 'Cannot delete booking' });
     }
 }
-const generateEmailMessage = (action, booking, userEmail) => {
+
+const generateEmailMessage = (action, booking) => {
     let subject, introText;
 
     if (action === 'create') {
@@ -173,7 +171,7 @@ const generateEmailMessage = (action, booking, userEmail) => {
     ` : '';
 
     return {
-        to: userEmail, // Use the user's email address
+        to: 'Punnarunwork@gmail.com', // Use the user's email address
         from: 'Punnarunwork@gmail.com',
         subject,
         html: `
